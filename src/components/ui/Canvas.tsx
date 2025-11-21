@@ -45,6 +45,7 @@ export default function Canvas({
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
     const lastPanPosition = useRef({ x: 0, y: 0 });
+    const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
 
     // Initialize Konva stage (only once on mount)
     useEffect(() => {
@@ -176,7 +177,7 @@ export default function Canvas({
     useEffect(() => {
         if (stageRef.current) {
             stageRef.current.draggable(false);
-            const cursor = tool === 'select' ? 'default' : tool === 'brush' ? 'crosshair' : 'crosshair';
+            const cursor = tool === 'select' ? 'default' : 'none'; // Hide cursor for brush/eraser
             stageRef.current.container().style.cursor = cursor;
         }
     }, [tool]);
@@ -321,9 +322,17 @@ export default function Canvas({
         };
 
         const handleMouseMove = () => {
+            const pointerPos = stage.getPointerPosition();
+
+            // Track cursor position for brush visualization
+            if (pointerPos && (tool === 'brush' || tool === 'eraser')) {
+                setCursorPos(pointerPos);
+            } else {
+                setCursorPos(null);
+            }
+
             // Handle panning
             if (isPanning) {
-                const pointerPos = stage.getPointerPosition();
                 if (!pointerPos) return;
 
                 const dx = pointerPos.x - lastPanPosition.current.x;
@@ -436,17 +445,22 @@ export default function Canvas({
             }
         };
 
+        const handleMouseLeave = () => {
+            setCursorPos(null);
+            handleMouseUp();
+        };
+
         stage.on('mousedown', handleMouseDown);
         stage.on('mousemove', handleMouseMove);
         stage.on('mouseup', handleMouseUp);
-        stage.on('mouseleave', handleMouseUp); // Handle mouse leaving canvas
+        stage.on('mouseleave', handleMouseLeave);
         stage.on('wheel', handleWheel);
 
         return () => {
             stage.off('mousedown', handleMouseDown);
             stage.off('mousemove', handleMouseMove);
             stage.off('mouseup', handleMouseUp);
-            stage.off('mouseleave', handleMouseUp);
+            stage.off('mouseleave', handleMouseLeave);
             stage.off('wheel', handleWheel);
         };
     }, [tool, brushSize, imageUrl, setMaskLines, isPanning]);
@@ -454,6 +468,21 @@ export default function Canvas({
     return (
         <div className="w-full h-full bg-zinc-950 relative overflow-hidden">
             <div ref={containerRef} className="w-full h-full" />
+
+            {/* Custom Brush Cursor */}
+            {cursorPos && (tool === 'brush' || tool === 'eraser') && (
+                <div
+                    className="pointer-events-none absolute rounded-full border-2 border-white/70 mix-blend-difference"
+                    style={{
+                        left: cursorPos.x,
+                        top: cursorPos.y,
+                        width: brushSize,
+                        height: brushSize,
+                        transform: 'translate(-50%, -50%)',
+                        transition: 'width 0.1s, height 0.1s'
+                    }}
+                />
+            )}
         </div>
     );
 }
