@@ -135,10 +135,7 @@ export function Sidebar({
                         value={imageCount}
                         onChange={(e) => setImageCount(parseInt(e.target.value))}
                         disabled={isGenerating}
-                        style={{
-                            background: `linear-gradient(to right, rgb(59 130 246) 0%, rgb(59 130 246) ${((imageCount - 1) / 3) * 100}%, rgb(63 63 70) ${((imageCount - 1) / 3) * 100}%, rgb(63 63 70) 100%)`
-                        }}
-                        className="flex-1 h-2 rounded-lg appearance-none cursor-pointer slider-thumb"
+                        className="flex-1 appearance-none cursor-pointer"
                     />
                     <span className="text-zinc-200 font-mono w-4 text-center">{imageCount}</span>
                 </div>

@@ -92,17 +92,14 @@ export function Toolbar({
 
                 {/* Brush Size Slider (only visible for brush/eraser) */}
                 {(currentTool === 'brush' || currentTool === 'eraser') && (
-                    <div className="w-32 ml-2 flex items-center gap-2">
+                    <div className="w-40 ml-2 flex items-center gap-2">
                         <input
                             type="range"
                             min="5"
-                            max="100"
+                            max="300"
                             value={brushSize}
                             onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                            style={{
-                                background: `linear-gradient(to right, rgb(59 130 246) 0%, rgb(59 130 246) ${((brushSize - 5) / 95) * 100}%, rgb(63 63 70) ${((brushSize - 5) / 95) * 100}%, rgb(63 63 70) 100%)`
-                            }}
-                            className="w-full h-2 rounded-lg appearance-none cursor-pointer slider-thumb"
+                            className="w-full appearance-none cursor-pointer"
                         />
                         <span className="text-xs text-zinc-400 font-mono w-8 text-right">{brushSize}</span>
                     </div>

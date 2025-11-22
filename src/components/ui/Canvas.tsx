@@ -476,8 +476,8 @@ export default function Canvas({
                     style={{
                         left: cursorPos.x,
                         top: cursorPos.y,
-                        width: brushSize,
-                        height: brushSize,
+                        width: brushSize * scale,
+                        height: brushSize * scale,
                         transform: 'translate(-50%, -50%)',
                         transition: 'width 0.1s, height 0.1s'
                     }}
