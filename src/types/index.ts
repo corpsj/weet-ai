@@ -41,12 +41,12 @@ export interface MaskPoint {
 }
 
 export interface CanvasTool {
-  type: 'brush' | 'eraser';
+  type: 'brush';
   size: number;
 }
 
 export interface MaskLine {
-  tool: 'brush' | 'eraser' | 'select';
+  tool: 'brush' | 'select';
   points: number[];
   size: number;
 }

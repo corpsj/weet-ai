@@ -177,7 +177,7 @@ export default function Canvas({
     useEffect(() => {
         if (stageRef.current) {
             stageRef.current.draggable(false);
-            const cursor = tool === 'select' ? 'default' : 'none'; // Hide cursor for brush/eraser
+            const cursor = tool === 'select' ? 'default' : 'none'; // Hide cursor for brush
             stageRef.current.container().style.cursor = cursor;
         }
     }, [tool]);
@@ -252,7 +252,7 @@ export default function Canvas({
         layer.find('.mask-line').forEach(line => line.destroy());
 
         // Draw new lines
-        maskLines.forEach((line, i) => {
+        maskLines.forEach((line) => {
             const konvaLine = new Konva.Line({
                 name: 'mask-line',
                 points: line.points,
@@ -261,7 +261,7 @@ export default function Canvas({
                 tension: 0.5,
                 lineCap: 'round',
                 lineJoin: 'round',
-                globalCompositeOperation: line.tool === 'eraser' ? 'destination-out' : 'source-over',
+                globalCompositeOperation: 'source-over',
                 opacity: 0.5
             });
             layer.add(konvaLine);
@@ -312,7 +312,7 @@ export default function Canvas({
                 tension: 0.5,
                 lineCap: 'round',
                 lineJoin: 'round',
-                globalCompositeOperation: tool === 'eraser' ? 'destination-out' : 'source-over',
+                globalCompositeOperation: 'source-over',
                 opacity: 0.5
             });
 
@@ -325,7 +325,7 @@ export default function Canvas({
             const pointerPos = stage.getPointerPosition();
 
             // Track cursor position for brush visualization
-            if (pointerPos && (tool === 'brush' || tool === 'eraser')) {
+            if (pointerPos && tool === 'brush') {
                 setCursorPos(pointerPos);
             } else {
                 setCursorPos(null);
@@ -470,7 +470,7 @@ export default function Canvas({
             <div ref={containerRef} className="w-full h-full" />
 
             {/* Custom Brush Cursor */}
-            {cursorPos && (tool === 'brush' || tool === 'eraser') && (
+            {cursorPos && tool === 'brush' && (
                 <div
                     className="pointer-events-none absolute rounded-full border-2 border-white/70 mix-blend-difference"
                     style={{

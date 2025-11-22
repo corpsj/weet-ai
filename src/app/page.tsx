@@ -269,25 +269,23 @@ export default function Home() {
 
     let drawnLines = 0;
     maskLines.forEach((line) => {
-      if (line.tool !== 'eraser') {
-        ctx.lineWidth = line.size * scaleFactor;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+      ctx.lineWidth = line.size * scaleFactor;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
 
-        ctx.beginPath();
-        for (let i = 0; i < line.points.length; i += 2) {
-          const x = line.points[i] * scaleFactor;
-          const y = line.points[i + 1] * scaleFactor;
+      ctx.beginPath();
+      for (let i = 0; i < line.points.length; i += 2) {
+        const x = line.points[i] * scaleFactor;
+        const y = line.points[i + 1] * scaleFactor;
 
-          if (i === 0) {
-            ctx.moveTo(x, y);
-          } else {
-            ctx.lineTo(x, y);
-          }
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
         }
-        ctx.stroke();
-        drawnLines++;
       }
+      ctx.stroke();
+      drawnLines++;
     });
 
     // Convert to base64

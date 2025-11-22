@@ -1,12 +1,12 @@
 import React from 'react';
 import {
     Undo, Redo, ChevronLeft, ChevronRight,
-    Brush, Eraser, Download, ZoomIn, ZoomOut,
+    Brush, Download, ZoomIn, ZoomOut,
     MousePointer2, Maximize2, X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type ToolType = 'select' | 'brush' | 'eraser';
+export type ToolType = 'select' | 'brush';
 
 interface ToolbarProps {
     currentTool: ToolType;
@@ -83,15 +83,9 @@ export function Toolbar({
                     onClick={() => setTool('brush')}
                     tooltip="Brush"
                 />
-                <ToolButton
-                    icon={Eraser}
-                    active={currentTool === 'eraser'}
-                    onClick={() => setTool('eraser')}
-                    tooltip="Eraser"
-                />
 
-                {/* Brush Size Slider (only visible for brush/eraser) */}
-                {(currentTool === 'brush' || currentTool === 'eraser') && (
+                {/* Brush Size Slider (only visible for brush) */}
+                {currentTool === 'brush' && (
                     <div className="w-40 ml-2 flex items-center gap-2">
                         <input
                             type="range"
