@@ -1,5 +1,6 @@
 export type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '5:4' | '4:5';
 export type ImageSize = '1K' | '2K' | '4K';
+export type ModelType = 'gemini-2.5-flash' | 'gemini-3-pro';
 
 export interface ImageGenerationConfig {
   prompt: string;
@@ -8,6 +9,14 @@ export interface ImageGenerationConfig {
   numberOfImages: number;
   maskData?: string; // Base64 encoded mask image for editing
   referenceImage?: string; // Base64 encoded reference image
+  // Advanced Settings
+  model?: ModelType;
+  style?: string;
+  lighting?: string;
+  camera?: string;
+  mood?: string;
+  negativePrompt?: string;
+  useGrounding?: boolean; // Google Search grounding (Pro model only)
 }
 
 export type ImageType = 'generated' | 'edited' | 'upscaled';

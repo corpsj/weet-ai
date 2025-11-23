@@ -1,54 +1,77 @@
 import React, { useRef } from 'react';
-import { Upload, Zap, Download, Image as ImageIcon } from 'lucide-react';
+import { Upload, Zap, Download, Image as ImageIcon, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface UpscaleSidebarProps {
+    mode: 'single' | 'batch';
+    setMode: (mode: 'single' | 'batch') => void;
     scale: number;
     setScale: (value: number) => void;
     isUpscaling: boolean;
     onUpscale: () => void;
     onUpload: (base64Data: string) => void;
+    onBatchUpload?: (files: File[]) => void;
     hasImage: boolean;
     hasResult: boolean;
     onDownload: () => void;
+    onBatchDownloadAll?: () => void;
     className?: string;
 }
 
 export function UpscaleSidebar({
+    mode,
+    setMode,
     scale,
     setScale,
     isUpscaling,
     onUpscale,
     onUpload,
+    onBatchUpload,
     hasImage,
     hasResult,
     onDownload,
+    onBatchDownloadAll,
     className
 }: UpscaleSidebarProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
 
-        if (!file.type.startsWith('image/')) {
-            alert('이미지 파일만 업로드할 수 있습니다');
-            return;
+        if (mode === 'batch') {
+            const validFiles: File[] = [];
+            Array.from(files).forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    validFiles.push(file);
+                }
+            });
+
+            if (validFiles.length > 0 && onBatchUpload) {
+                onBatchUpload(validFiles);
+            }
+        } else {
+            // Single mode
+            const file = files[0];
+            if (!file.type.startsWith('image/')) {
+                alert('이미지 파일만 업로드할 수 있습니다');
+                return;
+            }
+
+            const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+            if (file.size > MAX_FILE_SIZE) {
+                alert('파일 크기는 10MB를 초과할 수 없습니다');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const base64 = event.target?.result as string;
+                const base64Data = base64.split(',')[1];
+                onUpload(base64Data);
+            };
+            reader.readAsDataURL(file);
         }
-
-        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-        if (file.size > MAX_FILE_SIZE) {
-            alert('파일 크기는 10MB를 초과할 수 없습니다');
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const base64 = event.target?.result as string;
-            const base64Data = base64.split(',')[1];
-            onUpload(base64Data);
-        };
-        reader.readAsDataURL(file);
 
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
@@ -62,6 +85,34 @@ export function UpscaleSidebar({
                 <span>업스케일</span>
             </div>
 
+            {/* Mode Toggle */}
+            <div className="bg-zinc-800 p-1 rounded-lg flex gap-1">
+                <button
+                    onClick={() => setMode('single')}
+                    className={cn(
+                        "flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-all",
+                        mode === 'single'
+                            ? "bg-zinc-700 text-white shadow-sm"
+                            : "text-zinc-400 hover:text-zinc-200"
+                    )}
+                >
+                    <ImageIcon className="w-4 h-4" />
+                    단일
+                </button>
+                <button
+                    onClick={() => setMode('batch')}
+                    className={cn(
+                        "flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-all",
+                        mode === 'batch'
+                            ? "bg-zinc-700 text-white shadow-sm"
+                            : "text-zinc-400 hover:text-zinc-200"
+                    )}
+                >
+                    <Layers className="w-4 h-4" />
+                    일괄
+                </button>
+            </div>
+
             {/* Image Upload */}
             <div className="space-y-2">
                 <input
@@ -69,6 +120,7 @@ export function UpscaleSidebar({
                     ref={fileInputRef}
                     onChange={handleFileUpload}
                     accept="image/*"
+                    multiple={mode === 'batch'}
                     className="hidden"
                 />
                 <button
@@ -128,12 +180,12 @@ export function UpscaleSidebar({
             {hasResult && (
                 <button
                     type="button"
-                    onClick={onDownload}
+                    onClick={mode === 'single' ? onDownload : onBatchDownloadAll}
                     disabled={isUpscaling}
                     className="w-full py-3 rounded-lg font-bold text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition-all flex items-center justify-center gap-2"
                 >
                     <Download className="w-4 h-4" />
-                    다운로드
+                    {mode === 'single' ? '다운로드' : '전체 다운로드'}
                 </button>
             )}
         </div>

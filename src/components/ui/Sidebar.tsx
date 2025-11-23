@@ -1,8 +1,9 @@
 import React, { useRef } from 'react';
-import { Settings, Image as ImageIcon, Type, Hash, LayoutGrid, Upload } from 'lucide-react';
+import { Settings, Image as ImageIcon, Type, Hash, LayoutGrid, Upload, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AdvancedSettings, AdvancedSettingsProps } from './AdvancedSettings';
 
-interface SidebarProps {
+interface SidebarProps extends Omit<AdvancedSettingsProps, 'isOpen' | 'onClose'> {
     prompt: string;
     setPrompt: (value: string) => void;
     aspectRatio: string;
@@ -18,23 +19,42 @@ interface SidebarProps {
     onToggleGallery: () => void;
 }
 
-export function Sidebar({
-    prompt,
-    setPrompt,
-    aspectRatio,
-    setAspectRatio,
-    resolution,
-    setResolution,
-    imageCount,
-    setImageCount,
-    onGenerate,
-    isGenerating,
-    className,
-    isGalleryOpen,
-    onToggleGallery,
-}: SidebarProps) {
+export function Sidebar(props: SidebarProps) {
+    const {
+        prompt,
+        setPrompt,
+        aspectRatio,
+        setAspectRatio,
+        resolution,
+        setResolution,
+        imageCount,
+        setImageCount,
+        onGenerate,
+        isGenerating,
+        className,
+        isGalleryOpen,
+        onToggleGallery,
+        // Advanced Settings
+        model,
+        setModel,
+        style,
+        setStyle,
+        lighting,
+        setLighting,
+        camera,
+        setCamera,
+        mood,
+        setMood,
+        negativePrompt,
+        setNegativePrompt,
+        useGrounding,
+        setUseGrounding,
+    } = props;
+
+    const [isAdvancedOpen, setIsAdvancedOpen] = React.useState(false);
+
     return (
-        <div className={cn("w-80 bg-zinc-900 border-r border-zinc-800 p-4 flex flex-col gap-6 h-full", className)}>
+        <div className={cn("w-80 shrink-0 bg-zinc-900 border-r border-zinc-800 p-4 flex flex-col gap-6 h-full relative z-20", className)}>
             <div className="flex items-center gap-2 text-zinc-100 font-bold text-xl mb-4">
                 <ImageIcon className="w-6 h-6 text-blue-500" />
                 <span>스튜디오</span>
@@ -52,6 +72,27 @@ export function Sidebar({
                     className="w-full h-32 bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                     disabled={isGenerating}
                 />
+
+                {/* Advanced Settings Toggle */}
+                <button
+                    type="button"
+                    onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+                    className={cn(
+                        "w-full flex items-center justify-between p-2 rounded-lg border transition-all text-xs font-medium",
+                        isAdvancedOpen
+                            ? "bg-blue-500/10 border-blue-500 text-blue-400"
+                            : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
+                    )}
+                >
+                    <div className="flex items-center gap-2">
+                        <Settings className="w-3 h-3" />
+                        <span>고급 설정</span>
+                    </div>
+                    <ChevronRight className={cn(
+                        "w-3 h-3 transition-transform duration-200",
+                        isAdvancedOpen ? "rotate-90" : ""
+                    )} />
+                </button>
             </div>
 
             {/* Aspect Ratio */}
@@ -85,7 +126,8 @@ export function Sidebar({
                             />
                             <span className={cn(
                                 "text-[10px] font-medium transition-colors",
-                                aspectRatio === ratio ? "text-blue-500" : "text-zinc-600 group-hover:text-zinc-400"
+                                "text-zinc-600 group-hover:text-zinc-400",
+                                aspectRatio === ratio && "text-blue-500"
                             )}>{ratio}</span>
                         </button>
                     ))}
@@ -176,6 +218,26 @@ export function Sidebar({
                     {isGalleryOpen ? '갤러리 닫기' : '갤러리 보기'}
                 </div>
             </button>
+
+            {/* Advanced Settings Flyout Panel */}
+            <AdvancedSettings
+                model={model}
+                setModel={setModel}
+                style={style}
+                setStyle={setStyle}
+                lighting={lighting}
+                setLighting={setLighting}
+                camera={camera}
+                setCamera={setCamera}
+                mood={mood}
+                setMood={setMood}
+                negativePrompt={negativePrompt}
+                setNegativePrompt={setNegativePrompt}
+                useGrounding={useGrounding}
+                setUseGrounding={setUseGrounding}
+                isOpen={isAdvancedOpen}
+                onClose={() => setIsAdvancedOpen(false)}
+            />
         </div>
     );
 }

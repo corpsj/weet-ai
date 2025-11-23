@@ -2,7 +2,7 @@ import React from 'react';
 import {
     Undo, Redo, ChevronLeft, ChevronRight,
     Brush, Download, ZoomIn, ZoomOut,
-    MousePointer2, Maximize2, X
+    MousePointer2, Maximize2, X, GalleryHorizontal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -22,10 +22,12 @@ interface ToolbarProps {
     onZoomIn: () => void;
     onZoomOut: () => void;
     onClearImage: () => void;
+    onToggleStrip?: () => void;
+    isStripOpen?: boolean;
     canUndo: boolean;
     canRedo: boolean;
     hasImages: boolean;
-    isUpscaling: boolean;
+    isUpscaling?: boolean;
     className?: string;
 }
 
@@ -43,10 +45,12 @@ export function Toolbar({
     onZoomIn,
     onZoomOut,
     onClearImage,
+    onToggleStrip,
+    isStripOpen,
     canUndo,
     canRedo,
     hasImages,
-    isUpscaling,
+    isUpscaling = false,
     className
 }: ToolbarProps) {
     return (
@@ -59,6 +63,14 @@ export function Toolbar({
             <div className="flex items-center gap-1 border-r border-zinc-700 pr-4">
                 <IconButton icon={ChevronLeft} onClick={onPrev} disabled={!hasImages} tooltip="Previous" />
                 <IconButton icon={ChevronRight} onClick={onNext} disabled={!hasImages} tooltip="Next" />
+                {hasImages && onToggleStrip && (
+                    <IconButton
+                        icon={GalleryHorizontal}
+                        onClick={onToggleStrip}
+                        tooltip={isStripOpen ? "Hide List" : "Show List"}
+                        className={isStripOpen ? "text-blue-400" : ""}
+                    />
+                )}
                 <div className="w-px h-6 bg-zinc-700 mx-1" />
                 <IconButton icon={X} onClick={onClearImage} disabled={!hasImages} tooltip="Close Image" className="hover:text-red-400" />
             </div>

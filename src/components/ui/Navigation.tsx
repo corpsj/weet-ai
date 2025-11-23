@@ -32,7 +32,15 @@ export function Navigation() {
     ];
 
     return (
-        <nav className="h-14 border-b border-zinc-800 bg-zinc-950 flex items-center px-4 shrink-0">
+        <nav className="h-14 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between px-4 shrink-0">
+            {/* Logo */}
+            <div className="flex items-center gap-2">
+                <span className="text-xl font-bold text-white">
+                    weet AI
+                </span>
+            </div>
+
+            {/* Menu */}
             <div className="flex items-center gap-1">
                 {navItems.map((item) => {
                     const isActive = pathname === item.href;

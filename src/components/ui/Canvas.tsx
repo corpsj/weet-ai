@@ -184,9 +184,10 @@ export default function Canvas({
 
     // Load and display image
     useEffect(() => {
-        if (!layerRef.current) return;
+        if (!layerRef.current || !stageRef.current) return;
 
         const layer = layerRef.current;
+        const stage = stageRef.current;
 
         // Remove old image if exists
         if (imageNodeRef.current) {
@@ -194,6 +195,13 @@ export default function Canvas({
             imageNodeRef.current = null;
             layer.batchDraw();
         }
+
+        // Reset stage view when image changes (prevents old scale/position from being applied to new image)
+        setScale(1);
+        setPosition({ x: 0, y: 0 });
+        stage.scale({ x: 1, y: 1 });
+        stage.position({ x: 0, y: 0 });
+        layer.batchDraw();
 
         // If no imageUrl, just remove the image and return
         if (!imageUrl) return;

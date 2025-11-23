@@ -41,3 +41,13 @@ next-env.d.ts
 # Generated images (keep only .gitkeep)
 /public/generated-images/*.png
 /public/generated-images/metadata.json
+
+# Python Backend
+/backend/venv/
+/backend/__pycache__/
+/backend/*.pyc
+/backend/.python-version
+/backend/models/*.pth
+/backend/models/*.onnx
+/backend/.pytest_cache/
+/backend/.coverage

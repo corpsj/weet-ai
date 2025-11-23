@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Sidebar } from '@/components/ui/Sidebar';
 import { Toolbar, ToolType } from '@/components/ui/Toolbar';
 import { Gallery } from '@/components/ui/Gallery';
+import { Toast, ToastType } from '@/components/ui/Toast';
+import { ImageSelectionStrip } from '@/components/ui/ImageSelectionStrip';
 import { Upload } from 'lucide-react';
 import { generateImage, editImage, downloadImage, isApiKeyConfigured } from '@/lib/gemini';
 import { addImagesToGallery, loadImagesFromStorage, deleteImageFromStorage } from '@/lib/storage';
@@ -26,6 +29,7 @@ const Canvas = dynamic(() => import('@/components/ui/Canvas'), {
 });
 
 export default function Home() {
+  const router = useRouter();
   // State management
   const [prompt, setPrompt] = useState('');
   const [editPrompt, setEditPrompt] = useState('');
@@ -33,7 +37,33 @@ export default function Home() {
   const [resolution, setResolution] = useState<string>('2K');
   const [imageCount, setImageCount] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isUpscaling, setIsUpscaling] = useState(false);
+
+  // Advanced Settings
+  const [model, setModel] = useState<'gemini-2.5-flash' | 'gemini-3-pro'>('gemini-3-pro');
+  const [style, setStyle] = useState('');
+  const [lighting, setLighting] = useState('');
+  const [camera, setCamera] = useState('');
+  const [mood, setMood] = useState('');
+  const [negativePrompt, setNegativePrompt] = useState('');
+  const [useGrounding, setUseGrounding] = useState(false);
+
+  // Toast State
+  const [toast, setToast] = useState<{ message: string; type: ToastType; isVisible: boolean }>({
+    message: '',
+    type: 'info',
+    isVisible: false,
+  });
+
+  const showToast = useCallback((message: string, type: ToastType = 'info') => {
+    setToast({ message, type, isVisible: true });
+  }, []);
+
+  const hideToast = useCallback(() => {
+    setToast((prev) => ({ ...prev, isVisible: false }));
+  }, []);
+
+  // Strip Visibility State
+  const [isStripOpen, setIsStripOpen] = useState(true);
 
   // Canvas state
   interface MaskLine {
@@ -53,7 +83,7 @@ export default function Home() {
   const [currentImageIndex, setCurrentImageIndex] = useState(-1);
   const [conversationHistory, setConversationHistory] = useState<ConversationHistory[]>([]);
 
-  // Load session state on mount (restore images when returning to studio)
+  // Load edit image from gallery if requested
   useEffect(() => {
     const loadEditImage = async () => {
       // Check if there's an image to edit from the gallery (by ID)
@@ -71,58 +101,15 @@ export default function Home() {
 
           // Clear the flag
           localStorage.removeItem('weet-ai-edit-image-id');
-          return; // Don't load session storage if we're editing from gallery
         } catch (e) {
           console.error('Failed to load edit image', e);
+          showToast('이미지를 불러오는 중 오류가 발생했습니다', 'error');
         }
-      }
-
-      // Restore session state (images from this session) - use IDs only
-      try {
-        const sessionImageIds = sessionStorage.getItem('weet-ai-session-image-ids');
-        const sessionIndex = sessionStorage.getItem('weet-ai-session-index');
-
-        if (sessionImageIds) {
-          const imageIds = JSON.parse(sessionImageIds);
-
-          // Load images from server by IDs
-          const allImages = await loadImagesFromStorage();
-          const sessionImages = imageIds
-            .map((id: string) => allImages.find(img => img.id === id))
-            .filter((img: GeneratedImage | undefined): img is GeneratedImage => img !== undefined);
-
-          if (sessionImages.length > 0) {
-            setImages(sessionImages);
-            if (sessionIndex) {
-              setCurrentImageIndex(parseInt(sessionIndex));
-            }
-          }
-        }
-      } catch (e) {
-        console.error('Failed to restore session state', e);
       }
     };
 
     loadEditImage();
-  }, []);
-
-  // Save session state whenever images change (only IDs to avoid quota exceeded)
-  useEffect(() => {
-    if (images.length > 0) {
-      try {
-        // Store only image IDs, not full base64 data
-        const imageIds = images.map(img => img.id);
-        sessionStorage.setItem('weet-ai-session-image-ids', JSON.stringify(imageIds));
-        sessionStorage.setItem('weet-ai-session-index', currentImageIndex.toString());
-      } catch (e) {
-        console.error('Failed to save session state', e);
-      }
-    } else {
-      // Clear session storage when no images
-      sessionStorage.removeItem('weet-ai-session-image-ids');
-      sessionStorage.removeItem('weet-ai-session-index');
-    }
-  }, [images, currentImageIndex]);
+  }, [showToast]);
 
   // Gallery
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
@@ -146,23 +133,32 @@ export default function Home() {
     resetView: () => void;
   } | null>(null);
 
-  // Error handling
-  const [error, setError] = useState('');
-
   // Check API key on mount
   useEffect(() => {
     if (!isApiKeyConfigured()) {
-      setError('Gemini API 키가 설정되지 않았습니다. .env.local 파일에 NEXT_PUBLIC_GEMINI_API_KEY를 설정해주세요.');
+      showToast('Gemini API 키가 설정되지 않았습니다. 설정 페이지에서 키를 등록해주세요.', 'error');
     }
-  }, []);
+  }, [showToast]);
 
   const currentImage = currentImageIndex >= 0 ? images[currentImageIndex] : null;
-  const currentImageUrl = currentImage ? `data:image/png;base64,${currentImage.base64Data}` : undefined;
+  const currentImageUrl = useMemo(() => {
+    return currentImage ? `data:image/png;base64,${currentImage.base64Data}` : undefined;
+  }, [currentImage]);
+
+  // Memoize Canvas callbacks to prevent unnecessary re-renders
+  const handleCanvasReady = useCallback((stage: any, methods: any, imageNode: any) => {
+    stageRef.current = stage;
+    canvasMethodsRef.current = methods;
+    imageNodeRef.current = imageNode;
+  }, []);
+
+  const handleImageLoad = useCallback((imageNode: any) => {
+    imageNodeRef.current = imageNode;
+  }, []);
 
   // Generate image handler
   const handleGenerate = async () => {
     setIsGenerating(true);
-    setError('');
 
     try {
       // Check if there's a mask for editing
@@ -176,7 +172,17 @@ export default function Home() {
             prompt,
             aspectRatio as AspectRatio,
             resolution as ImageSize,
-            conversationHistory
+            conversationHistory,
+            // Advanced Settings
+            {
+              model,
+              style: style || undefined,
+              lighting: lighting || undefined,
+              camera: camera || undefined,
+              mood: mood || undefined,
+              negativePrompt: negativePrompt || undefined,
+              useGrounding,
+            }
           );
 
           if (result.images.length > 0) {
@@ -184,13 +190,17 @@ export default function Home() {
             await addImagesToGallery(result.images);
 
             // Add to current session
-            setImages([...images, ...result.images]);
-            setCurrentImageIndex(images.length);
+            setImages((prevImages) => {
+              const newImages = [...prevImages, ...result.images];
+              setCurrentImageIndex(prevImages.length); // Select the first new image
+              return newImages;
+            });
             setConversationHistory(result.conversationHistory);
             setMaskLines([]);
             setHistory([[]]);
             setHistoryStep(0);
             imageNodeRef.current = null; // Reset image node ref
+            showToast('이미지 편집이 완료되었습니다', 'success');
           }
         }
       } else {
@@ -205,6 +215,14 @@ export default function Home() {
               aspectRatio: aspectRatio as AspectRatio,
               imageSize: resolution as ImageSize,
               numberOfImages: 1,
+              // Advanced Settings
+              model,
+              style: style || undefined,
+              lighting: lighting || undefined,
+              camera: camera || undefined,
+              mood: mood || undefined,
+              negativePrompt: negativePrompt || undefined,
+              useGrounding,
             },
             latestHistory
           );
@@ -220,15 +238,22 @@ export default function Home() {
           await addImagesToGallery(allGeneratedImages);
 
           // Add to current session
-          setImages([...images, ...allGeneratedImages]);
-          setCurrentImageIndex(images.length);
+          setImages((prevImages) => {
+            const newImages = [...prevImages, ...allGeneratedImages];
+            // If multiple images generated, stay on the first one or the last one?
+            // Let's select the first of the new batch
+            setCurrentImageIndex(prevImages.length);
+            return newImages;
+          });
           setConversationHistory(latestHistory);
           imageNodeRef.current = null; // Reset image node ref
+          setIsStripOpen(true); // Auto-show strip on new generation
+          showToast(`${allGeneratedImages.length}장의 이미지가 생성되었습니다`, 'success');
         }
       }
     } catch (err) {
       console.error('Generation error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to generate image');
+      showToast(err instanceof Error ? err.message : '이미지 생성에 실패했습니다', 'error');
     } finally {
       setIsGenerating(false);
     }
@@ -375,36 +400,46 @@ export default function Home() {
         currentImage.base64Data,
         `weet-ai-${currentImage.timestamp}.png`
       );
+      showToast('이미지가 다운로드되었습니다', 'success');
     }
-  }, [currentImage]);
+  }, [currentImage, showToast]);
 
-  // Upscale placeholder
+  // Upscale with Real-ESRGAN (Redirect to Upscale Page)
   const handleUpscale = useCallback(() => {
-    if (currentImage) {
-      setIsUpscaling(true);
-      // TODO: Implement Real-ESRGAN upscaling
-      setTimeout(() => {
-        setIsUpscaling(false);
-        alert('업스케일 기능은 곧 출시됩니다!');
-      }, 1000);
-    }
-  }, [currentImage]);
+    if (!currentImage) return;
+
+    // Save current image to localStorage for the Upscale page
+    localStorage.setItem('upscale_source_image', currentImage.base64Data);
+
+    // Navigate to Upscale page
+    router.push('/upscale');
+  }, [currentImage, router]);
 
   // Handle edit prompt submission
   const handleEditSubmit = useCallback(async () => {
     if (!editPrompt.trim() || !currentImage) return;
 
     setIsGenerating(true);
-    setError('');
 
     try {
       let result;
+
+      // Advanced settings for editing
+      const advancedSettings = {
+        model,
+        style: style || undefined,
+        lighting: lighting || undefined,
+        camera: camera || undefined,
+        mood: mood || undefined,
+        negativePrompt: negativePrompt || undefined,
+        useGrounding,
+      };
 
       // If there are mask lines, do masked editing
       if (maskLines.length > 0) {
         const maskedImageBase64 = await extractMaskedImageFromStage();
         if (!maskedImageBase64) {
-          setError('마스킹된 이미지를 추출할 수 없습니다');
+          showToast('마스킹된 이미지를 추출할 수 없습니다', 'error');
           return;
         }
 
@@ -413,7 +448,8 @@ export default function Home() {
           editPrompt,
           aspectRatio as AspectRatio,
           resolution as ImageSize,
-          conversationHistory
+          conversationHistory,
+          advancedSettings
         );
       } else {
         // No mask - generate new image based on current image + prompt
@@ -422,7 +458,8 @@ export default function Home() {
           editPrompt,
           aspectRatio as AspectRatio,
           resolution as ImageSize,
-          conversationHistory
+          conversationHistory,
+          advancedSettings
         );
       }
 
@@ -431,22 +468,26 @@ export default function Home() {
         await addImagesToGallery(result.images);
 
         // Add to current session
-        setImages([...images, ...result.images]);
-        setCurrentImageIndex(images.length);
+        setImages((prevImages) => {
+          const newImages = [...prevImages, ...result.images];
+          setCurrentImageIndex(prevImages.length);
+          return newImages;
+        });
         setConversationHistory(result.conversationHistory);
         setMaskLines([]);
         setHistory([[]]);
         setHistoryStep(0);
         setEditPrompt('');
         imageNodeRef.current = null; // Reset image node ref for new image
+        showToast('이미지 변형이 완료되었습니다', 'success');
       }
     } catch (err) {
       console.error('Edit error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to edit image');
+      showToast(err instanceof Error ? err.message : '이미지 변형에 실패했습니다', 'error');
     } finally {
       setIsGenerating(false);
     }
-  }, [editPrompt, currentImage, maskLines, aspectRatio, resolution, conversationHistory, images, extractMaskedImageFromStage]);
+  }, [editPrompt, currentImage, maskLines, aspectRatio, resolution, conversationHistory, extractMaskedImageFromStage, model, style, lighting, camera, mood, negativePrompt, useGrounding, showToast]);
 
   // Zoom
   const handleZoomIn = useCallback(() => {
@@ -481,8 +522,11 @@ export default function Home() {
     await addImagesToGallery([newImage]);
 
     // Add to current session
-    setImages([...images, newImage]);
-    setCurrentImageIndex(images.length);
+    setImages((prevImages) => {
+      const newImages = [...prevImages, newImage];
+      setCurrentImageIndex(prevImages.length);
+      return newImages;
+    });
     setMaskLines([]);
     setHistory([[]]);
     setHistoryStep(0);
@@ -490,7 +534,8 @@ export default function Home() {
     if (canvasMethodsRef.current) {
       canvasMethodsRef.current.resetView();
     }
-  }, [images, aspectRatio, resolution]);
+    showToast('이미지가 업로드되었습니다', 'success');
+  }, [aspectRatio, resolution, showToast]);
 
   // Gallery handlers
   const handleSelectFromGallery = (index: number) => {
@@ -537,6 +582,7 @@ export default function Home() {
         setCurrentImageIndex(currentImageIndex - 1);
       }
     }
+    showToast('이미지가 삭제되었습니다', 'info');
   };
 
   const [isDragging, setIsDragging] = useState(false);
@@ -545,12 +591,12 @@ export default function Home() {
   // File processing helper
   const processFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
-      alert('이미지 파일만 업로드할 수 있습니다');
+      showToast('이미지 파일만 업로드할 수 있습니다', 'error');
       return;
     }
     const MAX_FILE_SIZE = 10 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
-      alert('파일 크기는 10MB를 초과할 수 없습니다');
+      showToast('파일 크기는 10MB를 초과할 수 없습니다', 'error');
       return;
     }
     const reader = new FileReader();
@@ -588,6 +634,23 @@ export default function Home() {
     }
   };
 
+  // Image Selection Handler
+  const handleSelectImage = (index: number) => {
+    setCurrentImageIndex(index);
+    setMaskLines([]);
+    setHistory([[]]);
+    setHistoryStep(0);
+    imageNodeRef.current = null;
+    if (canvasMethodsRef.current) {
+      canvasMethodsRef.current.resetView();
+    }
+    setIsStripOpen(false); // Auto-hide strip on selection
+  };
+
+  const handleToggleStrip = () => {
+    setIsStripOpen(!isStripOpen);
+  };
+
   return (
     <div className="flex h-full overflow-hidden bg-zinc-950">
       <Sidebar
@@ -603,6 +666,22 @@ export default function Home() {
         isGenerating={isGenerating}
         isGalleryOpen={isGalleryOpen}
         onToggleGallery={() => setIsGalleryOpen(!isGalleryOpen)}
+
+        // Advanced Settings Props
+        model={model}
+        setModel={setModel}
+        style={style}
+        setStyle={setStyle}
+        lighting={lighting}
+        setLighting={setLighting}
+        camera={camera}
+        setCamera={setCamera}
+        mood={mood}
+        setMood={setMood}
+        negativePrompt={negativePrompt}
+        setNegativePrompt={setNegativePrompt}
+        useGrounding={useGrounding}
+        setUseGrounding={setUseGrounding}
       />
 
       <main
@@ -655,14 +734,8 @@ export default function Home() {
           setMaskLines={updateMaskLines}
           tool={tool}
           brushSize={brushSize}
-          onCanvasReady={(stage, methods, imageNode) => {
-            stageRef.current = stage;
-            canvasMethodsRef.current = methods;
-            imageNodeRef.current = imageNode;
-          }}
-          onImageLoad={(imageNode) => {
-            imageNodeRef.current = imageNode;
-          }}
+          onCanvasReady={handleCanvasReady}
+          onImageLoad={handleImageLoad}
         />
 
         <Toolbar
@@ -679,18 +752,20 @@ export default function Home() {
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
           onClearImage={handleClearImage}
+          onToggleStrip={handleToggleStrip}
+          isStripOpen={isStripOpen}
           canUndo={historyStep > 0}
           canRedo={historyStep < history.length - 1}
           hasImages={images.length > 0}
-          isUpscaling={isUpscaling}
         />
 
-        {/* Error Display */}
-        {error && (
-          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-900/90 backdrop-blur-md text-white px-6 py-3 rounded-lg shadow-lg max-w-md z-50">
-            <p className="text-sm font-medium">오류</p>
-            <p className="text-xs mt-1">{error}</p>
-          </div>
+        {/* Multi-Image Selection Strip */}
+        {isStripOpen && (
+          <ImageSelectionStrip
+            images={images}
+            selectedIndex={currentImageIndex}
+            onSelect={handleSelectImage}
+          />
         )}
 
         {/* Loading Indicator */}
@@ -705,16 +780,16 @@ export default function Home() {
           </div>
         )}
 
-        {/* Image Counter */}
-        {images.length > 0 && (
+        {/* Image Counter (Only show if single image or strip is hidden) */}
+        {images.length === 1 && (
           <div className="absolute top-4 right-4 bg-zinc-900/90 backdrop-blur-md px-4 py-2 rounded-lg text-white text-sm shadow-lg border border-zinc-700/50 z-30">
-            {currentImageIndex + 1} / {images.length}
+            1 / 1
           </div>
         )}
 
         {/* Edit Prompt Input */}
         {currentImage && (
-          <div className="absolute bottom-24 right-4 z-30 max-w-md">
+          <div className="absolute bottom-28 right-4 z-30 max-w-md">
             <div className="bg-zinc-900/90 backdrop-blur-md border border-zinc-700/50 rounded-lg shadow-2xl p-3">
               <label className="text-zinc-400 text-xs font-medium mb-2 block">
                 {maskLines.length > 0 ? '마스킹 영역 수정' : '이미지 변형'}
@@ -760,6 +835,13 @@ export default function Home() {
         onSelect={handleSelectFromGallery}
         onDelete={handleDeleteFromGallery}
         currentIndex={currentImageIndex >= 0 && images[currentImageIndex] ? galleryImages.findIndex(img => img.id === images[currentImageIndex].id) : -1}
+      />
+
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
       />
     </div>
   );

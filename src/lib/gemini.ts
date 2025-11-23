@@ -1,14 +1,25 @@
-import { ImageGenerationConfig, GeneratedImage, ConversationHistory, AspectRatio, ImageSize, ImageType } from '@/types';
+import { ImageGenerationConfig, GeneratedImage, ConversationHistory, AspectRatio, ImageSize, ImageType, ModelType } from '@/types';
 
-const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-const MODEL = 'gemini-3-pro-image-preview';
-const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+// Model mapping
+const MODEL_MAP: Record<ModelType, string> = {
+  'gemini-2.5-flash': 'gemini-2.5-flash-image',
+  'gemini-3-pro': 'gemini-3-pro-image-preview'
+};
+
+function getApiKey(): string | undefined {
+  if (typeof window !== 'undefined') {
+    const storedKey = localStorage.getItem('gemini_api_key');
+    if (storedKey?.trim()) return storedKey;
+  }
+  return undefined;
+}
 
 /**
  * API 키가 설정되어 있는지 확인합니다.
  */
 export function isApiKeyConfigured(): boolean {
-  return !!API_KEY && API_KEY.trim().length > 0;
+  const key = getApiKey();
+  return !!key && key.trim().length > 0;
 }
 
 interface GeminiResponse {
@@ -29,18 +40,41 @@ interface GeminiResponse {
 }
 
 /**
- * Gemini 개발자 가이드 권장사항에 따라 프롬프트를 최적화합니다.
- * "Describe the scene, don't just list keywords" - 서술형 프롬프트로 변환
+ * 고급 설정을 기반으로 프롬프트를 강화합니다.
  */
-function optimizePrompt(userPrompt: string): string {
-  // 사용자가 이미 서술형으로 작성한 경우 그대로 사용
-  if (userPrompt.length > 50 && userPrompt.includes(' ') && !userPrompt.includes(',')) {
-    return userPrompt;
+function enhancePrompt(config: ImageGenerationConfig): string {
+  let enhancedPrompt = config.prompt;
+
+  // Style, lighting, camera, mood를 자연스럽게 조합
+  const descriptors: string[] = [];
+
+  if (config.style) {
+    descriptors.push(`${config.style} style`);
   }
 
-  // 키워드 리스트인 경우 서술형으로 변환 제안
-  return `Create an image with the following characteristics: ${userPrompt}.
-Focus on composition, lighting, and atmosphere to create a cohesive scene.`;
+  if (config.lighting) {
+    descriptors.push(`${config.lighting} lighting`);
+  }
+
+  if (config.camera) {
+    descriptors.push(`shot with ${config.camera}`);
+  }
+
+  if (config.mood) {
+    descriptors.push(`${config.mood} atmosphere`);
+  }
+
+  // 프롬프트에 설명 추가
+  if (descriptors.length > 0) {
+    enhancedPrompt = `${enhancedPrompt}, ${descriptors.join(', ')}`;
+  }
+
+  // Negative prompt 처리 (자연어 제약 조건)
+  if (config.negativePrompt) {
+    enhancedPrompt = `${enhancedPrompt}. Avoid: ${config.negativePrompt}`;
+  }
+
+  return enhancedPrompt;
 }
 
 /**
@@ -70,11 +104,21 @@ export async function generateImage(
   images: GeneratedImage[];
   conversationHistory: ConversationHistory[];
 }> {
-  if (!API_KEY) {
-    throw new Error('Gemini API key is not configured. Please set NEXT_PUBLIC_GEMINI_API_KEY in .env.local');
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    throw new Error('Gemini API key is not configured. Please set it in Settings or .env.local');
   }
 
-  const optimizedPrompt = optimizePrompt(config.prompt);
+  // 모델 선택 (기본값: gemini-3-pro)
+  const modelType = config.model || 'gemini-3-pro';
+  const modelName = MODEL_MAP[modelType];
+  const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+
+  // 고급 설정을 반영하여 프롬프트 강화
+  const enhancedPrompt = enhancePrompt(config);
+
+  console.log('🎨 Model:', modelName);
+  console.log('📝 Enhanced Prompt:', enhancedPrompt);
 
   // Limit conversation history to prevent excessive token usage
   const limitedHistory = limitConversationHistory(conversationHistory);
@@ -83,7 +127,7 @@ export async function generateImage(
   // 새로운 사용자 요청 추가
   const userContent: any = {
     role: 'user',
-    parts: [{ text: optimizedPrompt }]
+    parts: [{ text: enhancedPrompt }]
   };
 
   // 마스크 또는 참조 이미지가 있는 경우 추가
@@ -111,10 +155,11 @@ export async function generateImage(
 
   console.log('📤 API parts:', userContent.parts.length);
 
-  const requestBody = {
+  // Request body 구성
+  const requestBody: any = {
     contents,
     generationConfig: {
-      responseModalities: ['IMAGE'],
+      responseModalities: ['TEXT', 'IMAGE'], // Grounding 사용 시 TEXT 필요
       temperature: 1.0,
       topP: 0.95,
       topK: 40,
@@ -126,62 +171,109 @@ export async function generateImage(
     }
   };
 
-  try {
-    const response = await fetch(`${API_ENDPOINT}?key=${API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`Gemini API error: ${response.status} - ${JSON.stringify(errorData)}`);
-    }
-
-    const data: GeminiResponse = await response.json();
-
-    if (!data.candidates || data.candidates.length === 0) {
-      throw new Error('No candidates returned from Gemini API');
-    }
-
-    const candidate = data.candidates[0];
-    const images: GeneratedImage[] = [];
-
-    // 이미지 데이터 추출 (thought signature 보존)
-    for (const part of candidate.content.parts) {
-      if (part.inlineData && part.inlineData.mimeType.startsWith('image/')) {
-        images.push({
-          id: `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          base64Data: part.inlineData.data,
-          prompt: config.prompt,
-          timestamp: Date.now(),
-          config,
-          type: imageType,
-          thoughtSignature: candidate.thoughtSignature
-        });
-      }
-    }
-
-    // 대화 히스토리 업데이트 (thought signature 포함)
-    const updatedHistory: ConversationHistory[] = [
-      ...contents,
-      {
-        role: 'model',
-        parts: candidate.content.parts,
-        thoughtSignature: candidate.thoughtSignature
-      }
-    ];
-
-    return {
-      images,
-      conversationHistory: updatedHistory
-    };
-  } catch (error) {
-    console.error('Error generating image:', error);
-    throw error;
+  // Google Search Grounding (Pro 모델 전용) - tools는 최상위 레벨에 위치
+  if (config.useGrounding && modelType === 'gemini-3-pro') {
+    requestBody.tools = [{ google_search: {} }];
+    console.log('🔍 Grounding enabled with Google Search');
   }
+
+  // Retry logic for transient errors
+  const maxRetries = 3;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 API attempt ${attempt}/${maxRetries}`);
+
+      const response = await fetch(`${API_ENDPOINT}?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error?.message || 'Unknown error';
+        const errorCode = errorData.error?.code || response.status;
+
+        // If it's a 500 error and we have retries left, retry
+        if (errorCode === 500 && attempt < maxRetries) {
+          console.warn(`⚠️ 500 error, retrying in ${attempt}s...`);
+          await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+          continue;
+        }
+
+        // For other errors or last retry, throw with detailed message
+        if (errorCode === 500) {
+          throw new Error(
+            `Gemini API 서버 오류가 발생했습니다. ` +
+            `모델명(${modelName})이 올바른지 확인하거나 잠시 후 다시 시도해주세요. ` +
+            `상세: ${errorMessage}`
+          );
+        }
+
+        throw new Error(`Gemini API error (${errorCode}): ${errorMessage}`);
+      }
+
+      const data: GeminiResponse = await response.json();
+
+      if (!data.candidates || data.candidates.length === 0) {
+        throw new Error('No candidates returned from Gemini API');
+      }
+
+      const candidate = data.candidates[0];
+      const images: GeneratedImage[] = [];
+
+      // 이미지 데이터 추출 (thought signature 보존)
+      for (const part of candidate.content.parts) {
+        if (part.inlineData && part.inlineData.mimeType.startsWith('image/')) {
+          images.push({
+            id: `img_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+            base64Data: part.inlineData.data,
+            prompt: config.prompt,
+            timestamp: Date.now(),
+            config,
+            type: imageType,
+            thoughtSignature: candidate.thoughtSignature
+          });
+        }
+      }
+
+      // 대화 히스토리 업데이트 (thought signature 포함)
+      const updatedHistory: ConversationHistory[] = [
+        ...contents,
+        {
+          role: 'model',
+          parts: candidate.content.parts,
+          thoughtSignature: candidate.thoughtSignature
+        }
+      ];
+
+      return {
+        images,
+        conversationHistory: updatedHistory
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.error(`❌ Attempt ${attempt} failed:`, lastError.message);
+
+      // If this was the last attempt, throw the error
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+
+      // For 500 errors, wait before retrying
+      if (lastError.message.includes('500')) {
+        console.log(`⏳ Waiting ${attempt}s before retry...`);
+        await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+      }
+    }
+  }
+
+  // Should never reach here, but TypeScript needs this
+  throw lastError || new Error('Unknown error occurred');
 }
 
 /**
@@ -193,7 +285,16 @@ export async function editImage(
   editPrompt: string,
   aspectRatio: AspectRatio,
   imageSize: ImageSize,
-  conversationHistory: ConversationHistory[]
+  conversationHistory: ConversationHistory[],
+  advancedSettings?: {
+    model?: ModelType;
+    style?: string;
+    lighting?: string;
+    camera?: string;
+    mood?: string;
+    negativePrompt?: string;
+    useGrounding?: boolean;
+  }
 ): Promise<{
   images: GeneratedImage[];
   conversationHistory: ConversationHistory[];
@@ -207,6 +308,8 @@ export async function editImage(
     imageSize,
     numberOfImages: 1,
     referenceImage: maskedImage, // 마스킹된 이미지를 참조 이미지로 전달
+    // Advanced Settings
+    ...advancedSettings,
   };
 
   return generateImage(config, conversationHistory, 'edited');

@@ -1,0 +1,12 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "env": {
+    "NEXT_PUBLIC_GEMINI_API_KEY": "@gemini-api-key"
+  },
+  "build": {
+    "env": {
+      "UPSCALE_BACKEND_URL": "@upscale-backend-url"
+    }
+  }
+}
