@@ -156,6 +156,11 @@ export default function Home() {
     imageNodeRef.current = imageNode;
   }, []);
 
+  // Reset imageNodeRef when current image changes to prevent overlap
+  useEffect(() => {
+    imageNodeRef.current = null;
+  }, [currentImageUrl]);
+
   // Generate image handler
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -199,7 +204,6 @@ export default function Home() {
             setMaskLines([]);
             setHistory([[]]);
             setHistoryStep(0);
-            imageNodeRef.current = null; // Reset image node ref
             showToast('이미지 편집이 완료되었습니다', 'success');
           }
         }
@@ -246,7 +250,6 @@ export default function Home() {
             return newImages;
           });
           setConversationHistory(latestHistory);
-          imageNodeRef.current = null; // Reset image node ref
           setIsStripOpen(true); // Auto-show strip on new generation
           showToast(`${allGeneratedImages.length}장의 이미지가 생성되었습니다`, 'success');
         }
@@ -359,7 +362,6 @@ export default function Home() {
       setMaskLines([]);
       setHistory([[]]);
       setHistoryStep(0);
-      imageNodeRef.current = null; // Reset image node ref
       if (canvasMethodsRef.current) {
         canvasMethodsRef.current.resetView();
       }
@@ -372,7 +374,6 @@ export default function Home() {
       setMaskLines([]);
       setHistory([[]]);
       setHistoryStep(0);
-      imageNodeRef.current = null; // Reset image node ref
       if (canvasMethodsRef.current) {
         canvasMethodsRef.current.resetView();
       }
@@ -387,7 +388,6 @@ export default function Home() {
     setHistoryStep(0);
     setEditPrompt('');
     setTool('select');
-    imageNodeRef.current = null;
     if (canvasMethodsRef.current) {
       canvasMethodsRef.current.resetView();
     }
@@ -478,7 +478,6 @@ export default function Home() {
         setHistory([[]]);
         setHistoryStep(0);
         setEditPrompt('');
-        imageNodeRef.current = null; // Reset image node ref for new image
         showToast('이미지 변형이 완료되었습니다', 'success');
       }
     } catch (err) {
@@ -530,7 +529,6 @@ export default function Home() {
     setMaskLines([]);
     setHistory([[]]);
     setHistoryStep(0);
-    imageNodeRef.current = null;
     if (canvasMethodsRef.current) {
       canvasMethodsRef.current.resetView();
     }
@@ -547,7 +545,6 @@ export default function Home() {
     setHistory([[]]);
     setHistoryStep(0);
     setIsGalleryOpen(false);
-    imageNodeRef.current = null;
     if (canvasMethodsRef.current) {
       canvasMethodsRef.current.resetView();
     }
@@ -576,7 +573,6 @@ export default function Home() {
         setMaskLines([]);
         setHistory([[]]);
         setHistoryStep(0);
-        imageNodeRef.current = null;
       } else if (currentImageIndex > sessionImageIndex) {
         // If we're deleting an image before the current one, adjust index
         setCurrentImageIndex(currentImageIndex - 1);
@@ -791,9 +787,14 @@ export default function Home() {
         {currentImage && (
           <div className="absolute bottom-28 right-4 z-30 max-w-md">
             <div className="bg-zinc-900/90 backdrop-blur-md border border-zinc-700/50 rounded-lg shadow-2xl p-3">
-              <label className="text-zinc-400 text-xs font-medium mb-2 block">
-                {maskLines.length > 0 ? '마스킹 영역 수정' : '이미지 변형'}
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-zinc-400 text-xs font-medium">
+                  {maskLines.length > 0 ? '마스킹 영역 수정' : '이미지 변형'}
+                </label>
+                <div className="text-zinc-500 text-xs">
+                  {aspectRatio} · {resolution}
+                </div>
+              </div>
               <div className="flex gap-2">
                 <input
                   type="text"

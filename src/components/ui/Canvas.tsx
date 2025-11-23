@@ -193,7 +193,6 @@ export default function Canvas({
         if (imageNodeRef.current) {
             imageNodeRef.current.destroy();
             imageNodeRef.current = null;
-            layer.batchDraw();
         }
 
         // Reset stage view when image changes (prevents old scale/position from being applied to new image)
@@ -204,22 +203,30 @@ export default function Canvas({
         layer.batchDraw();
 
         // If no imageUrl, just remove the image and return
-        if (!imageUrl) return;
+        if (!imageUrl) {
+            layer.batchDraw();
+            return;
+        }
 
         // Load new image
         const imageObj = new Image();
         imageObj.crossOrigin = 'anonymous';
         imageObj.onload = () => {
+            // Double check that this is still the current image to load
+            if (imageObj.src !== imageUrl) return;
+
             const konvaImage = new Konva.Image({
                 image: imageObj,
                 x: 0,
                 y: 0
             });
 
+            // Remove any existing image nodes before adding new one
+            layer.find('Image').forEach(node => node.destroy());
+
             imageNodeRef.current = konvaImage;
             layer.add(konvaImage);
             konvaImage.moveToBottom();
-            layer.batchDraw();
 
             // Notify parent of image load
             if (onImageLoad) {
@@ -227,25 +234,24 @@ export default function Canvas({
             }
 
             // Center and fit image
-            if (stageRef.current) {
-                const stage = stageRef.current;
-                const containerWidth = stage.width();
-                const containerHeight = stage.height();
+            const containerWidth = stage.width();
+            const containerHeight = stage.height();
 
-                const scaleX = (containerWidth * 0.8) / imageObj.width;
-                const scaleY = (containerHeight * 0.8) / imageObj.height;
-                const fitScale = Math.min(scaleX, scaleY);
+            const scaleX = (containerWidth * 0.8) / imageObj.width;
+            const scaleY = (containerHeight * 0.8) / imageObj.height;
+            const fitScale = Math.min(scaleX, scaleY);
 
-                const newX = (containerWidth - imageObj.width * fitScale) / 2;
-                const newY = (containerHeight - imageObj.height * fitScale) / 2;
+            const newX = (containerWidth - imageObj.width * fitScale) / 2;
+            const newY = (containerHeight - imageObj.height * fitScale) / 2;
 
-                setScale(fitScale);
-                setPosition({ x: newX, y: newY });
+            setScale(fitScale);
+            setPosition({ x: newX, y: newY });
 
-                stage.scale({ x: fitScale, y: fitScale });
-                stage.position({ x: newX, y: newY });
-                layer.batchDraw();
-            }
+            stage.scale({ x: fitScale, y: fitScale });
+            stage.position({ x: newX, y: newY });
+
+            // Batch draw only once after all updates
+            layer.batchDraw();
         };
         imageObj.src = imageUrl;
     }, [imageUrl, onImageLoad]);
