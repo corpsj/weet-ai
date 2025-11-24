@@ -141,6 +141,19 @@ export async function generateImage(
     });
   }
 
+  // Multiple reference images (up to 13)
+  if (config.referenceImages && config.referenceImages.length > 0) {
+    console.log('📷 Ref images count:', config.referenceImages.length);
+    config.referenceImages.forEach((refImg) => {
+      userContent.parts.push({
+        inlineData: {
+          mimeType: 'image/png',
+          data: refImg
+        }
+      });
+    });
+  }
+
   if (config.maskData) {
     console.log('🎭 Mask:', config.maskData.length);
     userContent.parts.push({
@@ -294,6 +307,7 @@ export async function editImage(
     mood?: string;
     negativePrompt?: string;
     useGrounding?: boolean;
+    referenceImages?: string[];
   }
 ): Promise<{
   images: GeneratedImage[];

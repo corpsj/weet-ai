@@ -36,7 +36,7 @@ export function Navigation() {
             {/* Logo */}
             <div className="flex items-center gap-2">
                 <span className="text-xl font-bold text-white">
-                    weet AI
+                    weet AI Studio
                 </span>
             </div>
 

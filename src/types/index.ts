@@ -9,6 +9,7 @@ export interface ImageGenerationConfig {
   numberOfImages: number;
   maskData?: string; // Base64 encoded mask image for editing
   referenceImage?: string; // Base64 encoded reference image
+  referenceImages?: string[]; // Array of Base64 encoded reference images (up to 13)
   // Advanced Settings
   model?: ModelType;
   style?: string;

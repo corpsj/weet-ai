@@ -82,6 +82,7 @@ export default function Home() {
   const [images, setImages] = useState<GeneratedImage[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(-1);
   const [conversationHistory, setConversationHistory] = useState<ConversationHistory[]>([]);
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
 
   // Load edit image from gallery if requested
   useEffect(() => {
@@ -187,6 +188,7 @@ export default function Home() {
               mood: mood || undefined,
               negativePrompt: negativePrompt || undefined,
               useGrounding,
+              referenceImages,
             }
           );
 
@@ -227,6 +229,7 @@ export default function Home() {
               mood: mood || undefined,
               negativePrompt: negativePrompt || undefined,
               useGrounding,
+              referenceImages,
             },
             latestHistory
           );
@@ -433,6 +436,7 @@ export default function Home() {
         mood: mood || undefined,
         negativePrompt: negativePrompt || undefined,
         useGrounding,
+        referenceImages,
       };
 
       // If there are mask lines, do masked editing
@@ -678,6 +682,8 @@ export default function Home() {
         setNegativePrompt={setNegativePrompt}
         useGrounding={useGrounding}
         setUseGrounding={setUseGrounding}
+        referenceImages={referenceImages}
+        setReferenceImages={setReferenceImages}
       />
 
       <main

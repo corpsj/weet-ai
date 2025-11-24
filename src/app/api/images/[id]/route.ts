@@ -29,10 +29,10 @@ async function writeMetadata(images: GeneratedImage[]): Promise<void> {
 // DELETE: Delete a specific image
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await props.params;
 
     // Delete image file
     const filepath = path.join(IMAGES_DIR, `${id}.png`);
