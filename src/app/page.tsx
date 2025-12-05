@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Sidebar } from '@/components/ui/Sidebar';
 import { Toolbar, ToolType } from '@/components/ui/Toolbar';
+import { DraggableBox } from '@/components/ui/DraggableBox';
 import { Gallery } from '@/components/ui/Gallery';
 import { Toast, ToastType } from '@/components/ui/Toast';
 import { ImageSelectionStrip } from '@/components/ui/ImageSelectionStrip';
@@ -33,7 +34,7 @@ export default function Home() {
   // State management
   const [prompt, setPrompt] = useState('');
   const [editPrompt, setEditPrompt] = useState('');
-  const [aspectRatio, setAspectRatio] = useState<string>('4:3');
+  const [aspectRatio, setAspectRatio] = useState<string>('3:2');
   const [resolution, setResolution] = useState<string>('2K');
   const [imageCount, setImageCount] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -194,7 +195,12 @@ export default function Home() {
 
           if (result.images.length > 0) {
             // Add to gallery (server storage)
-            await addImagesToGallery(result.images);
+            try {
+              await addImagesToGallery(result.images);
+            } catch (e) {
+              console.error('Failed to save images to gallery:', e);
+              // Continue to show images in UI even if save fails
+            }
 
             // Add to current session
             setImages((prevImages) => {
@@ -242,7 +248,11 @@ export default function Home() {
 
         if (allGeneratedImages.length > 0) {
           // Add to gallery (server storage)
-          await addImagesToGallery(allGeneratedImages);
+          try {
+            await addImagesToGallery(allGeneratedImages);
+          } catch (e) {
+            console.error('Failed to save images to gallery:', e);
+          }
 
           // Add to current session
           setImages((prevImages) => {
@@ -401,7 +411,7 @@ export default function Home() {
     if (currentImage) {
       downloadImage(
         currentImage.base64Data,
-        `weet-ai-${currentImage.timestamp}.png`
+        `weet-ai-${currentImage.timestamp}.jpg`
       );
       showToast('이미지가 다운로드되었습니다', 'success');
     }
@@ -469,7 +479,11 @@ export default function Home() {
 
       if (result.images.length > 0) {
         // Add to gallery (server storage)
-        await addImagesToGallery(result.images);
+        try {
+          await addImagesToGallery(result.images);
+        } catch (e) {
+          console.error('Failed to save images to gallery:', e);
+        }
 
         // Add to current session
         setImages((prevImages) => {
@@ -522,7 +536,11 @@ export default function Home() {
     };
 
     // Add to gallery (server storage)
-    await addImagesToGallery([newImage]);
+    try {
+      await addImagesToGallery([newImage]);
+    } catch (e) {
+      console.error('Failed to save uploaded image to gallery:', e);
+    }
 
     // Add to current session
     setImages((prevImages) => {
@@ -592,11 +610,6 @@ export default function Home() {
   const processFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
       showToast('이미지 파일만 업로드할 수 있습니다', 'error');
-      return;
-    }
-    const MAX_FILE_SIZE = 10 * 1024 * 1024;
-    if (file.size > MAX_FILE_SIZE) {
-      showToast('파일 크기는 10MB를 초과할 수 없습니다', 'error');
       return;
     }
     const reader = new FileReader();
@@ -791,19 +804,22 @@ export default function Home() {
 
         {/* Edit Prompt Input */}
         {currentImage && (
-          <div className="absolute bottom-28 right-4 z-30 max-w-md">
+          <DraggableBox
+            initialPosition={{ x: window.innerWidth / 2 - 200, y: window.innerHeight - 200 }}
+            className="z-30 w-[calc(100%-2rem)] max-w-md"
+            handleClassName="drag-handle"
+          >
             <div className="bg-zinc-900/90 backdrop-blur-md border border-zinc-700/50 rounded-lg shadow-2xl p-3">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-zinc-400 text-xs font-medium">
+              <div className="flex items-center justify-between mb-2 drag-handle cursor-grab active:cursor-grabbing">
+                <label className="text-zinc-400 text-xs font-medium pointer-events-none">
                   {maskLines.length > 0 ? '마스킹 영역 수정' : '이미지 변형'}
                 </label>
-                <div className="text-zinc-500 text-xs">
+                <div className="text-zinc-500 text-xs pointer-events-none">
                   {aspectRatio} · {resolution}
                 </div>
               </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
+              <div className="flex gap-2 items-end">
+                <textarea
                   value={editPrompt}
                   onChange={(e) => setEditPrompt(e.target.value)}
                   onKeyDown={(e) => {
@@ -814,7 +830,8 @@ export default function Home() {
                   }}
                   placeholder={maskLines.length > 0 ? "마스킹된 영역을 어떻게 수정할까요?" : "이미지를 어떻게 변형할까요?"}
                   disabled={isGenerating}
-                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  rows={3}
+                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed resize-none custom-scrollbar"
                 />
                 <button
                   onClick={handleEditSubmit}
@@ -830,7 +847,7 @@ export default function Home() {
                   : '현재 이미지를 기반으로 새 이미지를 생성합니다'}
               </p>
             </div>
-          </div>
+          </DraggableBox>
         )}
       </main>
 

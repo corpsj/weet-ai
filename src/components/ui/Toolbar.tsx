@@ -55,7 +55,7 @@ export function Toolbar({
 }: ToolbarProps) {
     return (
         <div className={cn(
-            "absolute bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900/90 backdrop-blur-md border border-zinc-700/50 rounded-2xl px-4 py-3 flex items-center gap-4 shadow-2xl z-40",
+            "absolute bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900/90 backdrop-blur-md border border-zinc-700/50 rounded-2xl px-4 py-3 flex items-center gap-4 shadow-2xl z-40 max-w-[calc(100%-2rem)] overflow-x-auto custom-scrollbar",
             className
         )}>
 

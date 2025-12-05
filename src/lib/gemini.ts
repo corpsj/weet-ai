@@ -7,10 +7,15 @@ const MODEL_MAP: Record<ModelType, string> = {
 };
 
 function getApiKey(): string | undefined {
+  // 1. localStorage에서 먼저 확인 (Settings에서 설정한 키)
   if (typeof window !== 'undefined') {
     const storedKey = localStorage.getItem('gemini_api_key');
     if (storedKey?.trim()) return storedKey;
   }
+  // 2. 환경 변수 fallback
+  const envKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  if (envKey?.trim()) return envKey;
+
   return undefined;
 }
 
@@ -314,7 +319,7 @@ export async function editImage(
   conversationHistory: ConversationHistory[];
 }> {
   // 마스킹된 영역(빨간색으로 표시된 부분)만 변경하도록 지시
-  const semanticPrompt = `In the provided image, the areas marked in red indicate where changes should be made. ${editPrompt}. Change only these marked areas while keeping everything else exactly the same, preserving the original style, lighting, and composition.`;
+  const semanticPrompt = `The provided image contains red markings which act as a mask. These red marked areas indicate exactly where you must generate new content based on this prompt: "${editPrompt}". \n\nIMPORTANT INSTRUCTIONS:\n1. Completely replace the content covered by the red markings.\n2. The red markings themselves MUST NOT appear in the final image.\n3. Keep all other parts of the image exactly the same.\n4. Ensure the new content blends seamlessly with the original style, lighting, and composition.`;
 
   const config: ImageGenerationConfig = {
     prompt: semanticPrompt,
@@ -348,7 +353,10 @@ export function base64ToBlob(base64: string, mimeType: string = 'image/png'): Bl
  * 이미지를 다운로드합니다
  */
 export function downloadImage(base64Data: string, filename: string = 'generated-image.png') {
-  const blob = base64ToBlob(base64Data);
+  const mimeType = filename.toLowerCase().endsWith('.jpg') || filename.toLowerCase().endsWith('.jpeg')
+    ? 'image/jpeg'
+    : 'image/png';
+  const blob = base64ToBlob(base64Data, mimeType);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

@@ -51,11 +51,22 @@ export async function GET(request: NextRequest) {
 // POST: Save new images
 export async function POST(request: NextRequest) {
   try {
-    const { images: newImages } = await request.json();
+    const formData = await request.formData();
+    const metadataStr = formData.get('metadata') as string;
+    const files = formData.getAll('files') as File[];
 
-    if (!Array.isArray(newImages) || newImages.length === 0) {
+    if (!metadataStr || !files || files.length === 0) {
       return NextResponse.json(
         { error: 'Invalid images data' },
+        { status: 400 }
+      );
+    }
+
+    const newImagesMetadata: GeneratedImage[] = JSON.parse(metadataStr);
+
+    if (newImagesMetadata.length !== files.length) {
+      return NextResponse.json(
+        { error: 'Mismatch between metadata and files' },
         { status: 400 }
       );
     }
@@ -63,31 +74,37 @@ export async function POST(request: NextRequest) {
     await ensureDirectory();
 
     // Save each image file
-    for (const image of newImages) {
-      const filename = `${image.id}.png`;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const metadata = newImagesMetadata[i];
+
+      // Use ID from metadata for filename
+      const filename = `${metadata.id}.png`;
       const filepath = path.join(IMAGES_DIR, filename);
 
-      // Convert base64 to buffer and save
-      const buffer = Buffer.from(image.base64Data, 'base64');
+      // Convert File to Buffer and save
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
       await writeFile(filepath, buffer);
 
-      // Remove base64Data from metadata (we'll load it from file when needed)
-      delete image.base64Data;
+      // Ensure base64Data is removed from metadata just in case
+      delete (metadata as any).base64Data;
     }
 
     // Update metadata
     const existingImages = await readMetadata();
-    const updatedImages = [...newImages, ...existingImages];
+    const updatedImages = [...newImagesMetadata, ...existingImages];
     await writeMetadata(updatedImages);
 
     return NextResponse.json({
       success: true,
-      count: newImages.length
+      count: newImagesMetadata.length
     });
   } catch (error) {
-    console.error('Error saving images:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error saving images:', errorMessage, error);
     return NextResponse.json(
-      { error: 'Failed to save images' },
+      { error: `Failed to save images: ${errorMessage}` },
       { status: 500 }
     );
   }

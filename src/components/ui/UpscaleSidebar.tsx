@@ -58,12 +58,6 @@ export function UpscaleSidebar({
                 return;
             }
 
-            const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-            if (file.size > MAX_FILE_SIZE) {
-                alert('파일 크기는 10MB를 초과할 수 없습니다');
-                return;
-            }
-
             const reader = new FileReader();
             reader.onload = (event) => {
                 const base64 = event.target?.result as string;

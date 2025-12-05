@@ -50,18 +50,43 @@ export const loadImagesFromStorage = async (): Promise<GeneratedImage[]> => {
 };
 
 // Save images to server
+// Save images to server
 export const addImagesToGallery = async (newImages: GeneratedImage[]): Promise<void> => {
   try {
+    const formData = new FormData();
+
+    // Append each image as a separate field or a JSON string for metadata + files
+    // Strategy: Send metadata as JSON, but exclude base64Data. Send base64Data as files.
+
+    const imagesMetadata = newImages.map(img => {
+      // Remove all large base64 data from metadata
+      const { base64Data, thumbnailData, ...rest } = img;
+      // Also remove base64 data from config
+      const cleanConfig = { ...rest.config };
+      delete cleanConfig.maskData;
+      delete cleanConfig.referenceImage;
+      delete cleanConfig.referenceImages;
+      return { ...rest, config: cleanConfig };
+    });
+
+    formData.append('metadata', JSON.stringify(imagesMetadata));
+
+    // Convert base64 to blobs and append as files
+    for (let i = 0; i < newImages.length; i++) {
+      const img = newImages[i];
+      const response = await fetch(`data:image/png;base64,${img.base64Data}`);
+      const blob = await response.blob();
+      formData.append('files', blob, `${img.id}.png`);
+    }
+
     const response = await fetch('/api/images', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ images: newImages }),
+      body: formData,
     });
 
     if (!response.ok) {
-      throw new Error('Failed to save images');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to save images');
     }
 
     console.log(`Successfully saved ${newImages.length} images to server`);

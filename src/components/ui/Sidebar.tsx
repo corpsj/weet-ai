@@ -125,7 +125,32 @@ export function Sidebar(props: SidebarProps) {
                         <ImageIcon className="w-3 h-3" /> 레퍼런스 이미지 ({referenceImages.length}/13)
                     </label>
 
-                    <div className="grid grid-cols-4 gap-2">
+                    <div
+                        className="grid grid-cols-4 gap-2"
+                        onDragOver={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }}
+                        onDrop={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const files = e.dataTransfer.files;
+                            if (!files) return;
+
+                            Array.from(files).forEach(file => {
+                                if (referenceImages.length >= 13) return;
+                                if (!file.type.startsWith('image/')) return;
+
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                    const base64 = event.target?.result as string;
+                                    const base64Data = base64.split(',')[1];
+                                    setReferenceImages((prev: string[]) => [...prev, base64Data].slice(0, 13));
+                                };
+                                reader.readAsDataURL(file);
+                            });
+                        }}
+                    >
                         {referenceImages.map((img, idx) => (
                             <div key={idx} className="relative aspect-square rounded-md overflow-hidden group border border-zinc-700">
                                 <img src={`data:image/png;base64,${img}`} alt={`Ref ${idx}`} className="w-full h-full object-cover" />
@@ -170,7 +195,7 @@ export function Sidebar(props: SidebarProps) {
                         <div className="col-span-2 text-[10px] text-zinc-500 text-center font-medium">세로</div>
 
                         {/* Buttons */}
-                        {['4:3', '16:9', '1:1', '3:4', '9:16'].map((ratio) => (
+                        {['3:2', '16:9', '1:1', '3:4', '9:16'].map((ratio) => (
                             <button
                                 key={ratio}
                                 type="button"
